@@ -40,7 +40,7 @@ app.get('/', (req, res) => {
     res.send('SSMIET Backend is Running (Brevo Mode)! 🚀');
 });
 
-app.post('/send-email', upload.single('pdf'), async (req, res) => {
+app.post('/', upload.single('pdf'), async (req, res) => {
   try {
     const { email, name, course, cutoff } = req.body;
     const pdfFile = req.file;

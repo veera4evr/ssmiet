@@ -629,6 +629,7 @@ export default function AdmissionsPage() {
 
       // 4. Backend Call - CORRECTED URL HERE
       const response = await fetch('https://ssmiet-backend.onrender.com', {
+      
         method: 'POST',
         body: formData,
       });
