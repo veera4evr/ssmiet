@@ -5,7 +5,6 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
-// Use memory storage to handle the PDF file in RAM
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors({
@@ -17,43 +16,34 @@ app.use(express.json());
 // --- CONFIGURATION ---
 const ADMIN_EMAIL = 'ssmietadmissionportal@gmail.com'; 
 
-// *** THE FIX: POOLING + EXTENDED TIMEOUTS ***
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,              // Using 465 (SSL) with pooling is widely considered the most stable
-  secure: true,           // True for 465
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  // POOLING: Keeps the connection open so it doesn't have to reconnect for every email
-  pool: true, 
-  maxConnections: 1,      // Keep it simple for free tier
-  rateLimit: 5,           // Prevent spamming
-  
-  // NETWORK SETTINGS
-  family: 4,              // FORCE IPv4 (Critical for Render)
-  
-  // TIMEOUTS: Increased to 60 seconds (10s was killing the connection)
-  connectionTimeout: 60000, 
-  greetingTimeout: 30000,
-  socketTimeout: 60000,
-  
-  tls: {
-    rejectUnauthorized: false
-  },
-  logger: true,
-  debug: true
-});
+// *** THE FIX: FRESH CONNECTION FUNCTION ***
+// Instead of one global transporter, we create a fresh one for every email.
+// This bypasses the "Idle Connection" blocks from Google.
+async function sendMailWithFreshConnection(to, subject, html, attachment) {
+  const transporter = nodemailer.createTransport({
+    // TRICK: Use googlemail.com instead of gmail.com
+    host: "smtp.googlemail.com", 
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+    // Network Settings
+    tls: { rejectUnauthorized: false },
+    family: 4, // Force IPv4
+  });
 
-// Verify connection on startup so you know it works immediately
-transporter.verify(function (error, success) {
-  if (error) {
-    console.log("⚠️ SMTP Connection Error:", error);
-  } else {
-    console.log("✅ Server is ready to take our messages");
-  }
-});
+  const mailOptions = {
+    from: `"SSMIET Admission Portal" <${process.env.EMAIL_USER}>`,
+    to: to,
+    subject: subject,
+    html: html,
+    attachments: [attachment]
+  };
+
+  return transporter.sendMail(mailOptions);
+}
 
 app.get('/', (req, res) => {
     res.send('SSMIET Backend is Running! 🚀');
@@ -75,14 +65,13 @@ app.post('/send-email', upload.single('pdf'), async (req, res) => {
 
     console.log(`Processing Application for: ${name}`);
 
+    // PDF Attachment Object
+    const attachment = { filename: pdfFile.originalname, content: pdfFile.buffer };
+
     // ==========================================
-    // EMAIL 1: TO ADMIN (Professional Report)
+    // EMAIL 1: TO ADMIN (Your Exact Template)
     // ==========================================
-    const adminMailOptions = {
-      from: `"SSMIET Portal Bot" <${process.env.EMAIL_USER}>`,
-      to: ADMIN_EMAIL, 
-      subject: `[New App] ${name} - ${course}`, 
-      html: `
+    const adminHtml = `
         <div style="font-family: 'Arial', sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #d1d5db; background-color: #ffffff;">
           
           <div style="background-color: #dc2626; padding: 20px; text-align: center;">
@@ -121,18 +110,12 @@ app.post('/send-email', upload.single('pdf'), async (req, res) => {
             </div>
           </div>
         </div>
-      `,
-      attachments: [{ filename: pdfFile.originalname, content: pdfFile.buffer }]
-    };
+    `;
 
     // ==========================================
-    // EMAIL 2: TO STUDENT (Professional Receipt)
+    // EMAIL 2: TO STUDENT (Your Exact Template)
     // ==========================================
-    const studentMailOptions = {
-      from: `"SSMIET Admissions" <${process.env.EMAIL_USER}>`,
-      to: email, 
-      subject: `Application Receipt - ${course}`,
-      html: `
+    const studentHtml = `
         <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; background-color: #ffffff;">
           
           <div style="background-color: #004d71; padding: 30px 20px; text-align: center;">
@@ -175,24 +158,34 @@ app.post('/send-email', upload.single('pdf'), async (req, res) => {
             <p style="margin: 5px 0 0;">This is an automated message. Please do not reply.</p>
           </div>
         </div>
-      `,
-      attachments: [{ filename: pdfFile.originalname, content: pdfFile.buffer }]
-    };
+    `;
 
-    // Send Sequentially with the Pooled Connection
-    console.log("Sending Admin Email...");
-    await transporter.sendMail(adminMailOptions);
-    console.log("Admin Email Sent.");
+    // --- SENDING LOGIC (Using the Helper Function) ---
+    
+    // 1. Send Admin Email
+    console.log("Creating fresh connection for Admin email...");
+    await sendMailWithFreshConnection(
+      ADMIN_EMAIL, 
+      `[New App] ${name} - ${course}`, 
+      adminHtml, 
+      attachment
+    );
+    console.log("✅ Admin Email Sent.");
 
-    console.log("Sending Student Email...");
-    await transporter.sendMail(studentMailOptions);
-    console.log("Student Email Sent.");
+    // 2. Send Student Email
+    console.log("Creating fresh connection for Student email...");
+    await sendMailWithFreshConnection(
+      email, 
+      `Application Receipt - ${course}`, 
+      studentHtml, 
+      attachment
+    );
+    console.log("✅ Student Email Sent.");
 
-    console.log('Success: Professional emails sent to both Admin and Student.');
     res.status(200).json({ message: 'Emails sent successfully' });
 
   } catch (error) {
-    console.error('Error sending emails:', error);
+    console.error('❌ Error sending emails:', error);
     res.status(500).json({ error: error.message });
   }
 });
