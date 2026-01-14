@@ -17,16 +17,20 @@ app.use(express.json());
 // --- CONFIGURATION ---
 const ADMIN_EMAIL = 'ssmietadmissionportal@gmail.com'; 
 
-// *** THE FIX IS HERE ***
-// We replaced "service: 'gmail'" with explicit host and port 465
+// *** THE FIX: SWITCH TO PORT 587 (TLS) ***
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // true for 465, false for other ports
+  port: 587,              // 587 is the standard for Cloud SMTP
+  secure: false,          // MUST be false for port 587 (it upgrades later)
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  tls: {
+    rejectUnauthorized: false // This fixes "Self Signed Certificate" errors common on Render
+  },
+  logger: true, // This will print debug info to Render logs if it fails
+  debug: true
 });
 
 app.get('/', (req, res) => {
