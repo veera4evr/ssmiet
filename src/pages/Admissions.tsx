@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import Header from "@/components/site/Header";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import logoUrl from "@/assets/ssm-logo.png";
-import { Loader2, CheckCircle2, CreditCard } from "lucide-react"; // Added Icons for Payment UI
+import { Loader2, CheckCircle2, CreditCard } from "lucide-react";
 
 // Schema Validation
 const schema = z.object({
@@ -627,8 +627,8 @@ export default function AdmissionsPage() {
       formData.append('cutoff', ((values.physicsMarks + values.chemistryMarks) / 2 + values.mathsMarks).toFixed(2));
       formData.append('payment_id', mockTxnId); // Attach Mock Payment ID
 
-      // 4. Backend Call
-      const response = await fetch('"https://ssmiet-backend.onrender.com', {
+      // 4. Backend Call - CORRECTED URL HERE
+      const response = await fetch('https://ssmiet-backend.onrender.com/send-email', {
         method: 'POST',
         body: formData,
       });
