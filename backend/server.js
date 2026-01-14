@@ -17,22 +17,42 @@ app.use(express.json());
 // --- CONFIGURATION ---
 const ADMIN_EMAIL = 'ssmietadmissionportal@gmail.com'; 
 
-// *** THE FIX: ROBUST CONFIGURATION ***
+// *** THE FIX: POOLING + EXTENDED TIMEOUTS ***
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 587,               // 587 is safer for cloud servers
-  secure: false,           // Must be false for 587
+  port: 465,              // Using 465 (SSL) with pooling is widely considered the most stable
+  secure: true,           // True for 465
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  // POOLING: Keeps the connection open so it doesn't have to reconnect for every email
+  pool: true, 
+  maxConnections: 1,      // Keep it simple for free tier
+  rateLimit: 5,           // Prevent spamming
+  
+  // NETWORK SETTINGS
+  family: 4,              // FORCE IPv4 (Critical for Render)
+  
+  // TIMEOUTS: Increased to 60 seconds (10s was killing the connection)
+  connectionTimeout: 60000, 
+  greetingTimeout: 30000,
+  socketTimeout: 60000,
+  
   tls: {
     rejectUnauthorized: false
   },
-  family: 4,               // FORCE IPv4 (Fixes the timeout issue)
-  connectionTimeout: 10000, // 10 seconds timeout
   logger: true,
   debug: true
+});
+
+// Verify connection on startup so you know it works immediately
+transporter.verify(function (error, success) {
+  if (error) {
+    console.log("⚠️ SMTP Connection Error:", error);
+  } else {
+    console.log("✅ Server is ready to take our messages");
+  }
 });
 
 app.get('/', (req, res) => {
@@ -159,7 +179,7 @@ app.post('/send-email', upload.single('pdf'), async (req, res) => {
       attachments: [{ filename: pdfFile.originalname, content: pdfFile.buffer }]
     };
 
-    // *** SEND SEQUENTIALLY (Fixes Drop Connection Issues) ***
+    // Send Sequentially with the Pooled Connection
     console.log("Sending Admin Email...");
     await transporter.sendMail(adminMailOptions);
     console.log("Admin Email Sent.");
@@ -177,7 +197,6 @@ app.post('/send-email', upload.single('pdf'), async (req, res) => {
   }
 });
 
-// IMPORTANT: Use Render's PORT or default to 5000
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Backend Server running on port ${PORT}`);
