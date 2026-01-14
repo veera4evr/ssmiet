@@ -24,7 +24,8 @@ async function sendBrevoEmail(toEmail, toName, subject, htmlContent, pdfFile) {
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      sender: { email: ADMIN_EMAIL, name: "SSMIET Portal Bot" },
+      // *** CHANGE IS HERE ***
+      sender: { email: ADMIN_EMAIL, name: "SSMIET ADMISSION PORTAL" }, 
       to: [{ email: toEmail, name: toName }],
       subject: subject,
       htmlContent: htmlContent,
@@ -61,21 +62,21 @@ app.post('/', upload.single('pdf'), async (req, res) => {
       return res.status(400).json({ error: 'Missing email or PDF file' });
     }
 
-    // *** THE FIX: FORCE INDIAN TIMEZONE (Asia/Kolkata) ***
+    // Force Indian Timezone (Asia/Kolkata)
     const now = new Date();
     
     const appDate = now.toLocaleDateString('en-IN', { 
       day: '2-digit', 
       month: 'long', 
       year: 'numeric',
-      timeZone: 'Asia/Kolkata' // <--- Forces IST
+      timeZone: 'Asia/Kolkata'
     });
     
     const appTime = now.toLocaleTimeString('en-IN', { 
       hour: '2-digit', 
       minute: '2-digit', 
       hour12: true,
-      timeZone: 'Asia/Kolkata' // <--- Forces IST
+      timeZone: 'Asia/Kolkata'
     });
 
     console.log(`Processing Application for: ${name}`);
