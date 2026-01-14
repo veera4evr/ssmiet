@@ -628,7 +628,7 @@ export default function AdmissionsPage() {
       formData.append('payment_id', mockTxnId); // Attach Mock Payment ID
 
       // 4. Backend Call
-      const response = await fetch('https://ssmiet-backend.onrender.com', {
+      const response = await fetch('"https://ssmiet-backend.onrender.com/send-email', {
         method: 'POST',
         body: formData,
       });
