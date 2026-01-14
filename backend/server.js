@@ -20,7 +20,7 @@ async function sendBrevoEmail(toEmail, toName, subject, htmlContent, pdfFile) {
     method: 'POST',
     headers: {
       'accept': 'application/json',
-      'api-key': process.env.BREVO_API_KEY, // Must start with 'xkeysib-'
+      'api-key': process.env.BREVO_API_KEY, // Uses the API Key you got from Brevo
       'content-type': 'application/json'
     },
     body: JSON.stringify({
@@ -51,7 +51,8 @@ app.get('/', (req, res) => {
     res.send('SSMIET Backend is Running (HTTP API Mode)! 🚀');
 });
 
-app.post('/send-email', upload.single('pdf'), async (req, res) => {
+// *** CHANGED: Now listening on '/' (Root) to match your Frontend ***
+app.post('/', upload.single('pdf'), async (req, res) => {
   try {
     const { email, name, course, cutoff } = req.body;
     const pdfFile = req.file;
