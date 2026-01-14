@@ -5,20 +5,32 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
-const upload = multer();
+// Use memory storage to handle the PDF file in RAM
+const upload = multer({ storage: multer.memoryStorage() });
 
-app.use(cors());
+app.use(cors({
+    origin: '*', // Allow connections from your frontend
+    methods: ['POST', 'GET']
+}));
 app.use(express.json());
 
 // --- CONFIGURATION ---
 const ADMIN_EMAIL = 'ssmietadmissionportal@gmail.com'; 
 
+// *** THE FIX IS HERE ***
+// We replaced "service: 'gmail'" with explicit host and port 465
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // true for 465, false for other ports
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+});
+
+app.get('/', (req, res) => {
+    res.send('SSMIET Backend is Running! 🚀');
 });
 
 app.post('/send-email', upload.single('pdf'), async (req, res) => {
@@ -156,7 +168,8 @@ app.post('/send-email', upload.single('pdf'), async (req, res) => {
   }
 });
 
-const PORT = 5000;
+// IMPORTANT: Use Render's PORT or default to 5000
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Backend Server running on http://localhost:${PORT}`);
+  console.log(`Backend Server running on port ${PORT}`);
 });
