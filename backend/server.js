@@ -9,7 +9,7 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors({
-    origin: '*', // Allow connections from your frontend
+    origin: '*', 
     methods: ['POST', 'GET']
 }));
 app.use(express.json());
@@ -17,19 +17,21 @@ app.use(express.json());
 // --- CONFIGURATION ---
 const ADMIN_EMAIL = 'ssmietadmissionportal@gmail.com'; 
 
-// *** THE FIX: SWITCH TO PORT 587 (TLS) ***
+// *** THE FIX: ROBUST CONFIGURATION ***
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 587,              // 587 is the standard for Cloud SMTP
-  secure: false,          // MUST be false for port 587 (it upgrades later)
+  port: 587,               // 587 is safer for cloud servers
+  secure: false,           // Must be false for 587
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   tls: {
-    rejectUnauthorized: false // This fixes "Self Signed Certificate" errors common on Render
+    rejectUnauthorized: false
   },
-  logger: true, // This will print debug info to Render logs if it fails
+  family: 4,               // FORCE IPv4 (Fixes the timeout issue)
+  connectionTimeout: 10000, // 10 seconds timeout
+  logger: true,
   debug: true
 });
 
@@ -157,11 +159,14 @@ app.post('/send-email', upload.single('pdf'), async (req, res) => {
       attachments: [{ filename: pdfFile.originalname, content: pdfFile.buffer }]
     };
 
-    // Send Both
-    await Promise.all([
-      transporter.sendMail(adminMailOptions),
-      transporter.sendMail(studentMailOptions)
-    ]);
+    // *** SEND SEQUENTIALLY (Fixes Drop Connection Issues) ***
+    console.log("Sending Admin Email...");
+    await transporter.sendMail(adminMailOptions);
+    console.log("Admin Email Sent.");
+
+    console.log("Sending Student Email...");
+    await transporter.sendMail(studentMailOptions);
+    console.log("Student Email Sent.");
 
     console.log('Success: Professional emails sent to both Admin and Student.');
     res.status(200).json({ message: 'Emails sent successfully' });
