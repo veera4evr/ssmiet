@@ -12,7 +12,7 @@ app.use(express.json());
 // --- CONFIGURATION ---
 const ADMIN_EMAIL = 'ssmietadmissionportal@gmail.com'; 
 
-// *** HELPER: Send Email via Brevo HTTP API (Port 443 - Unblockable) ***
+// *** HELPER: Send Email via Brevo HTTP API ***
 async function sendBrevoEmail(toEmail, toName, subject, htmlContent, pdfFile) {
   const url = 'https://api.brevo.com/v3/smtp/email';
   
@@ -20,7 +20,7 @@ async function sendBrevoEmail(toEmail, toName, subject, htmlContent, pdfFile) {
     method: 'POST',
     headers: {
       'accept': 'application/json',
-      'api-key': process.env.BREVO_API_KEY, // Uses the API Key you got from Brevo
+      'api-key': process.env.BREVO_API_KEY, 
       'content-type': 'application/json'
     },
     body: JSON.stringify({
@@ -30,7 +30,7 @@ async function sendBrevoEmail(toEmail, toName, subject, htmlContent, pdfFile) {
       htmlContent: htmlContent,
       attachment: [
         {
-          content: pdfFile.buffer.toString('base64'), // Convert PDF to base64 for API
+          content: pdfFile.buffer.toString('base64'), 
           name: pdfFile.originalname
         }
       ]
@@ -51,7 +51,7 @@ app.get('/', (req, res) => {
     res.send('SSMIET Backend is Running (HTTP API Mode)! 🚀');
 });
 
-// *** CHANGED: Now listening on '/' (Root) to match your Frontend ***
+// Root Route '/'
 app.post('/', upload.single('pdf'), async (req, res) => {
   try {
     const { email, name, course, cutoff } = req.body;
@@ -61,14 +61,27 @@ app.post('/', upload.single('pdf'), async (req, res) => {
       return res.status(400).json({ error: 'Missing email or PDF file' });
     }
 
+    // *** THE FIX: FORCE INDIAN TIMEZONE (Asia/Kolkata) ***
     const now = new Date();
-    const appDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
-    const appTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    
+    const appDate = now.toLocaleDateString('en-IN', { 
+      day: '2-digit', 
+      month: 'long', 
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata' // <--- Forces IST
+    });
+    
+    const appTime = now.toLocaleTimeString('en-IN', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: true,
+      timeZone: 'Asia/Kolkata' // <--- Forces IST
+    });
 
     console.log(`Processing Application for: ${name}`);
 
     // ==========================================
-    // EMAIL 1: TO ADMIN (Your Exact Template)
+    // EMAIL 1: TO ADMIN
     // ==========================================
     const adminHtml = `
       <div style="font-family: 'Arial', sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #d1d5db; background-color: #ffffff;">
@@ -108,7 +121,7 @@ app.post('/', upload.single('pdf'), async (req, res) => {
     `;
 
     // ==========================================
-    // EMAIL 2: TO STUDENT (Your Exact Template)
+    // EMAIL 2: TO STUDENT
     // ==========================================
     const studentHtml = `
       <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; background-color: #ffffff;">
@@ -150,15 +163,12 @@ app.post('/', upload.single('pdf'), async (req, res) => {
       </div>
     `;
 
-    // --- SEND SEQUENTIALLY VIA API ---
-    
+    // --- SEND SEQUENTIALLY ---
     console.log("Sending Admin Email (API)...");
     await sendBrevoEmail(ADMIN_EMAIL, "Admin", `[New App] ${name} - ${course}`, adminHtml, pdfFile);
-    console.log("✅ Admin Email Sent.");
-
+    
     console.log(`Sending Student Email to ${email} (API)...`);
     await sendBrevoEmail(email, name, `Application Receipt - ${course}`, studentHtml, pdfFile);
-    console.log("✅ Student Email Sent.");
 
     res.status(200).json({ message: 'Emails sent successfully via HTTP API' });
 
